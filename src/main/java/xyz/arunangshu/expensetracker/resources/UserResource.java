@@ -1,7 +1,13 @@
 package xyz.arunangshu.expensetracker.resources;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import xyz.arunangshu.expensetracker.Constants;
 import xyz.arunangshu.expensetracker.domain.User;
 import xyz.arunangshu.expensetracker.services.UserService;
 
@@ -26,9 +33,7 @@ public class UserResource {
 
     User user = userService.validateUser(email, password);
 
-    Map<String, String> map = new HashMap<>();
-    map.put("message", "User login successful!");
-    return new ResponseEntity<>(map, HttpStatus.OK);
+    return new ResponseEntity<>(generateJWT(user), HttpStatus.OK);
   }
 
   @PostMapping("/register")
@@ -40,8 +45,25 @@ public class UserResource {
 
     User user = userService.registerUser(firstName, lastName, email, password);
 
+    return new ResponseEntity<>(generateJWT(user), HttpStatus.OK);
+  }
+
+  private Map<String, String> generateJWT(User user) {
+    long timestamp = System.currentTimeMillis();
+    SecretKey secretKey = Keys.hmacShaKeyFor(Constants.API_SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+
+    String token = Jwts.builder()
+        .setIssuedAt(new Date(timestamp))
+        .setExpiration(new Date(timestamp + Constants.TOKEN_VALIDITY))
+        .claim("userId", user.getUserId())
+        .claim("email", user.getEmail())
+        .claim("firstName", user.getFirstName())
+        .claim("lastName", user.getLastName())
+        .signWith(secretKey, SignatureAlgorithm.HS256)
+        .compact();
+
     Map<String, String> map = new HashMap<>();
-    map.put("message", "User registration successful!");
-    return new ResponseEntity<>(map, HttpStatus.OK);
+    map.put("token", token);
+    return map;
   }
 }
